@@ -5,6 +5,7 @@ import numpy as np
 import time
 import math
 
+# Initialize Mediapipe and PyAutoGUI
 mpHands = mp.solutions.hands
 hands = mpHands.Hands(max_num_hands=1)
 mpDraw = mp.solutions.drawing_utils
@@ -15,7 +16,6 @@ cap = cv2.VideoCapture(0)
 
 prev_click_time = 0
 prev_scroll_time = 0
-scroll_direction = 0
 
 while True:
     success, img = cap.read()
@@ -37,40 +37,44 @@ while True:
             mpDraw.draw_landmarks(img, handLms, mpHands.HAND_CONNECTIONS)
 
             if len(lmList) >= 13:
-                x1, y1 = lmList[8]
-                x2, y2 = lmList[12]
-                x3, y3 = lmList[4]
+                index_x, index_y = lmList[8]
+                middle_x, middle_y = lmList[12]
+                thumb_x, thumb_y = lmList[4]
 
-                cv2.circle(img, (x1, y1), 10, (255, 0, 255), cv2.FILLED)
-                cv2.circle(img, (x2, y2), 10, (0, 0, 255), cv2.FILLED)
-                cv2.circle(img, (x3, y3), 10, (0, 255, 0), cv2.FILLED)
+                # Draw circles on fingertips
+                cv2.circle(img, (index_x, index_y), 10, (255, 0, 255), cv2.FILLED)
+                cv2.circle(img, (middle_x, middle_y), 10, (0, 0, 255), cv2.FILLED)
+                cv2.circle(img, (thumb_x, thumb_y), 10, (0, 255, 0), cv2.FILLED)
 
-                screen_x = np.interp(x1, (100, w - 100), (0, screen_width))
-                screen_y = np.interp(y1, (100, h - 100), (0, screen_height))
-
+                # Move mouse using index finger
+                screen_x = np.interp(index_x, (100, w - 100), (0, screen_width))
+                screen_y = np.interp(index_y, (100, h - 100), (0, screen_height))
                 pyautogui.moveTo(screen_x, screen_y)
 
-                dist = math.hypot(x2 - x1, y2 - y1)
-
-                if dist < 30:
+                # Check for pinch (click) - distance between index and thumb
+                pinch_dist = math.hypot(index_x - thumb_x, index_y - thumb_y)
+                if pinch_dist < 30:
                     current_time = time.time()
                     if current_time - prev_click_time > 1:
                         pyautogui.click()
                         prev_click_time = current_time
-                        cv2.circle(img, ((x1 + x2) // 2, (y1 + y2) // 2), 15, (0, 255, 255), cv2.FILLED)
-                
-                elif dist > 50:
-                    vertical_move = y1 - y2
+                        cv2.circle(img, ((index_x + thumb_x) // 2, (index_y + thumb_y) // 2), 15, (0, 255, 255), cv2.FILLED)
 
-                    if abs(vertical_move) > 20:
+                # Scroll with two fingers (index and middle)
+                two_finger_dist = math.hypot(index_x - middle_x, index_y - middle_y)
+                if two_finger_dist < 40:
+                    vertical_movement = index_y - middle_y
+
+                    if abs(vertical_movement) > 20:
                         current_time = time.time()
                         if current_time - prev_scroll_time > 0.5:
-                            if vertical_move > 0:
-                                pyautogui.scroll(10)
+                            if vertical_movement > 0:
+                                pyautogui.scroll(20)  # Scroll up
                             else:
-                                pyautogui.scroll(-10)
+                                pyautogui.scroll(-20)  # Scroll down
                             prev_scroll_time = current_time
 
+    # Display the result
     cv2.imshow("Virtual Mouse", img)
     if cv2.waitKey(1) == ord('q'):
         break
